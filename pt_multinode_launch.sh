@@ -14,7 +14,8 @@
 #SBATCH --mail-user=USER@DOMAIN
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-task=8         
+#SBATCH --gpus-per-task=8
+#SBATCH --cpus-per-task=128
 #SBATCH --mem=96gb
 #SBATCH --partition=hpg-ai
 #SBATCH --reservation=HPGAI
