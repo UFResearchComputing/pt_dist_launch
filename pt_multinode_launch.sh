@@ -7,7 +7,9 @@
 # UF Research Computing
 #
 
-##### resource allocation
+#
+# Resource allocation.
+#
 #SBATCH --wait-all-nodes=1
 #SBATCH --job-name=test
 #SBATCH --mail-type=ALL
@@ -26,12 +28,61 @@
 #SBATCH --output=test_%j.out
 
 
-# The script that runs torch.distributed on each node. It will receive the
-# primary node hostname and TCP port to contact the primary node as the
-# environment variables PRIMARY and PRIMARY_PORT.
-PT_LAUNCH_SCRIPT=run_pt_on_node.sh
+#
+# Training command specification.
+#
+CHECKPOINT_PATH=checkpoints_2_node
+VOCAB_FILE=../data/vocab.txt
+DATA_PATH=../data/uf1_TEXT_sentence
 
-source pt_multinode_helper_funcs.sh
+BERT_ARGS="--num-layers 24 \
+    --hidden-size 1024 \
+    --num-attention-heads 16 \
+    --seq-length 512 \
+    --max-position-embeddings 512 \
+    --lr 0.0001 \
+    --lr-decay-iters 990000 \
+    --train-iters 200000 \
+    --min-lr 0.00001 \
+    --lr-warmup-fraction 0.01 \
+    --micro-batch-size 4 \
+    --global-batch-size 256 \
+    --vocab-file $(realpath $VOCAB_FILE) \
+    --split 949,50,1 \
+    --fp16"
+
+OUTPUT_ARGS="--log-interval 10 \
+    --save-interval 20000 \
+    --eval-interval 100 \
+    --eval-iters 10 \
+    --checkpoint-activations"
+
+TRAINING_SCRIPT="$(realpath Megatron-LM/pretrain_bert.py)"
+TRAINING_CMD="$TRAINING_SCRIPT \
+    $BERT_ARGS \
+    $OUTPUT_ARGS \
+    --save $(realpath $CHECKPOINT_PATH) \
+    --load $(realpath $CHECKPOINT_PATH) \
+    --data-path $(realpath $DATA_PATH)"
+
+
+#
+# Python location (if not provided, system default will be used).
+#
+PYTHON_PATH="singularity exec --nv \
+        /apps/nvidia/containers/pytorch/20.12-py3.sif python"
+
+
+#
+# The location of the Pytorch multi-node launch utilities.
+#
+PT_LAUNCH_UTILS_PATH=pt_dist_launch
+
+
+#
+# The remainder of this script should not require modification.
+#
+source "${PT_LAUNCH_UTILS_PATH}/pt_multinode_helper_funcs.sh"
 #export NCCL_DEBUG=INFO
 init_node_info
 
@@ -41,6 +92,8 @@ echo "Primary node: $PRIMARY"
 echo "Primary TCP port: $PRIMARY_PORT"
 echo "Secondary nodes: $SECONDARIES"
 
-echo "Running $(realpath $PT_LAUNCH_SCRIPT) on each node..."
-srun $(realpath $PT_LAUNCH_SCRIPT)
+PT_LAUNCH_SCRIPT=$(realpath "${PT_LAUNCH_UTILS_PATH}/run_pt_on_node.sh")
+echo "Running \"$TRAINING_CMD\" on each node..."
+srun "$PT_LAUNCH_SCRIPT" "$(realpath $PT_LAUNCH_UTILS_PATH)" \
+    "$TRAINING_CMD" "$PYTHON_PATH"
 

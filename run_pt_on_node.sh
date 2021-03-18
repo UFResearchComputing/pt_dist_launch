@@ -9,47 +9,20 @@
 # environment variables.
 #
 # (c) 2021, Brian J. Stucky
-# UF Research Computiing
+# UF Research Computing
 #
 
-CHECKPOINT_PATH=checkpoints_2_node
-VOCAB_FILE=../data/vocab.txt
-DATA_PATH=../data/uf1_TEXT_sentence
+PT_LAUNCH_UTILS_PATH=$1
+TRAINING_CMD=$2
+PYTHON_PATH=$3
 
-BERT_ARGS="--num-layers 24 \
-           --hidden-size 1024 \
-           --num-attention-heads 16 \
-           --seq-length 512 \
-           --max-position-embeddings 512 \
-           --lr 0.0001 \
-           --lr-decay-iters 990000 \
-           --train-iters 200000 \
-           --min-lr 0.00001 \
-           --lr-warmup-fraction 0.01 \
-           --micro-batch-size 4 \
-           --global-batch-size 256 \
-           --vocab-file $(realpath $VOCAB_FILE) \
-           --split 949,50,1 \
-           --fp16"
-
-OUTPUT_ARGS="--log-interval 10 \
-             --save-interval 20000 \
-             --eval-interval 100 \
-             --eval-iters 10 \
-             --checkpoint-activations"
-
-TRAINING_SCRIPT="$(realpath Megatron-LM/pretrain_bert.py)"
-TRAINING_CMD="$TRAINING_SCRIPT \
-       $BERT_ARGS \
-       $OUTPUT_ARGS \
-       --save $(realpath $CHECKPOINT_PATH) \
-       --load $(realpath $CHECKPOINT_PATH) \
-       --data-path $(realpath $DATA_PATH)"
-
+if [ -z "$PYTHON_PATH" ]
+then
+    PYTHON_PATH="python"
+fi
 
 # This should be the complete command to launch the per-node training run.
-LAUNCH_CMD="singularity exec --nv \
-    /apps/nvidia/containers/pytorch/20.12-py3.sif python \
+LAUNCH_CMD="$PYTHON_PATH \
         -m torch.distributed.launch \
               --nproc_per_node=$SLURM_GPUS_PER_TASK \
               --nnodes=$SLURM_JOB_NUM_NODES \
@@ -58,6 +31,6 @@ LAUNCH_CMD="singularity exec --nv \
               --master_port=$PRIMARY_PORT \
             $TRAINING_CMD"
 
-source pt_multinode_helper_funcs.sh
+source "${PT_LAUNCH_UTILS_PATH}/pt_multinode_helper_funcs.sh"
 run_with_retry "$LAUNCH_CMD"
 
