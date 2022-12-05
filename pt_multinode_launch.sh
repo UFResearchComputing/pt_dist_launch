@@ -20,7 +20,6 @@
 #SBATCH --cpus-per-task=128
 #SBATCH --mem=96gb
 #SBATCH --partition=hpg-ai
-#SBATCH --reservation=HPGAI
 # Enable the following to limit the allocation to a single SU.
 ## SBATCH --constraint=su7
 #SBATCH --exclusive
